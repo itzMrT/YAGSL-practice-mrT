@@ -4,6 +4,12 @@
 
 package frc.robot;
 
+import com.pathplanner.lib.commands.PathfindingCommand;
+import com.pathplanner.lib.pathfinding.LocalADStar;
+import com.pathplanner.lib.pathfinding.Pathfinding;
+
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.Timer;
@@ -38,22 +44,26 @@ public class Robot extends TimedRobot
   /**
    * This function is run when the robot is first started up and should be used for any initialization code.
    */
-  @Override
-  public void robotInit()
-  {
-    // Instantiate our RobotContainer.  This will perform all our button bindings, and put our
-    // autonomous chooser on the dashboard.
+ 
+@Override
+public void robotInit() {
+    // 1) DO THIS FIRST: select the pathfinder implementation
+    Pathfinding.setPathfinder(new LocalADStar());
+
+    // 2) Warm up the pathfinding pipeline (recommended by PathPlanner docs)
+    //    This does NOT move the robot; it pre-runs AD* & JIT so your first real command starts promptly.
+    PathfindingCommand.warmupCommand().schedule();
+
+
+    // 4) Now build your container (constructs SwerveSubsystem & configures AutoBuilder)
     m_robotContainer = new RobotContainer();
 
-    // Create a timer to disable motor brake a few seconds after disable.  This will let the robot stop
-    // immediately when disabled, but then also let it be pushed more 
+    // 5) Remaining init
     disabledTimer = new Timer();
-
-    if (isSimulation())
-    {
-      DriverStation.silenceJoystickConnectionWarning(true);
+    if (isSimulation()) {
+        DriverStation.silenceJoystickConnectionWarning(true);
     }
-  }
+}
 
   /**
    * This function is called every 20 ms, no matter the mode. Use this for items like diagnostics that you want ran
@@ -97,18 +107,26 @@ public class Robot extends TimedRobot
   /**
    * This autonomous runs the autonomous command selected by your {@link RobotContainer} class.
    */
-  @Override
-  public void autonomousInit()
-  {
-    m_robotContainer.setMotorBrake(true);
-    m_autonomousCommand = m_robotContainer.getAutonomousCommand();
 
-    // schedule the autonomous command (example)
-    if (m_autonomousCommand != null)
-    {
-      m_autonomousCommand.schedule();
+@Override
+public void autonomousInit() {
+    m_robotContainer.setMotorBrake(true);
+
+    // ✅ Reset odometry to a known field start pose (meters, blue-origin coordinates)
+    // Pick something sane for your sim start; example: at x=0.5, y=0.5, heading 0°
+    m_robotContainer.getDrivebase().resetOdometry(new Pose2d(
+        7, 7, Rotation2d.fromDegrees(0)
+    ));
+
+    m_autonomousCommand = m_robotContainer.getAutonomousCommand();
+    if (m_autonomousCommand != null) {
+        System.out.println("[AUTO] Scheduling autonomous command...");
+        m_autonomousCommand.schedule();
+    } else {
+        System.out.println("[AUTO] Autonomous command is null");
     }
-  }
+}
+
 
   /**
    * This function is called periodically during autonomous.
@@ -165,11 +183,14 @@ public class Robot extends TimedRobot
   {
   }
 
-  /**
-   * This function is called periodically whilst in simulation.
-   */
+
   @Override
-  public void simulationPeriodic()
-  {
+  public void simulationPeriodic() {
+      // For testing: drop one fake vision sample per second
+
+      
+
+    
   }
+  
 }

@@ -4,7 +4,10 @@
 
 package frc.robot;
 
+import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.auto.NamedCommands;
+import com.pathplanner.lib.path.PathConstraints;
+
 import edu.wpi.first.math.controller.ProfiledPIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -14,6 +17,8 @@ import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Filesystem;
 import edu.wpi.first.wpilibj.RobotBase;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
@@ -90,15 +95,26 @@ public class RobotContainer
                                                                                .translationHeadingOffset(Rotation2d.fromDegrees(
                                                                                    0));
 
-  /**
+  
+  //autochoose on smartdashboard
+  private final SendableChooser<Command> autoChooser = new SendableChooser<>();
+
+
+  
+                                                                                   /**
    * The container for the robot. Contains subsystems, OI devices, and commands.
    */
   public RobotContainer()
   {
     // Configure the trigger bindings
+    
+    configureAutos();
     configureBindings();
     DriverStation.silenceJoystickConnectionWarning(true);
     NamedCommands.registerCommand("test", Commands.print("I EXIST"));
+
+    SmartDashboard.putData("Auto Chooser", autoChooser);
+
   }
 
   /**
@@ -182,14 +198,87 @@ public class RobotContainer
    *
    * @return the command to run in autonomous
    */
-  public Command getAutonomousCommand()
-  {
-    // An example command will be run in autonomous
-    return drivebase.getAutonomousCommand("New Auto");
-  }
+ 
+
+
+   private void configureAutos() {
+
+    Pose2d START_BLUE_LEFT  = new Pose2d(0.5, 1.0, Rotation2d.fromDegrees(0));
+    Pose2d START_BLUE_MID   = new Pose2d(0.5, 4.0, Rotation2d.fromDegrees(0));
+    Pose2d START_BLUE_RIGHT = new Pose2d(0.5, 7.0, Rotation2d.fromDegrees(0));
+
+
+    Pose2d toPiece1   = new Pose2d(4.0, 5.0, Rotation2d.fromDegrees(-5));
+    Pose2d toHPStation= new Pose2d(1.931, 1.868, Rotation2d.fromDegrees(180)); // ID20 "toward" example
+
+    
+    Pose2d toReefSlot = new Pose2d(6.3, 3.2, Rotation2d.fromDegrees(90));
+
+    // Auto A: Left start → piece → human station
+    Command leftAuto = edu.wpi.first.wpilibj2.command.Commands.sequence(
+        // Reset odometry to the intended field start pose for this auto
+        drivebase.runOnce(() -> drivebase.resetOdometry(START_BLUE_LEFT)),
+        pathfindTo(toPiece1),
+        pathfindTo(toHPStation)
+    );
+
+    // Auto B: Mid start → piece → reef slot
+    Command midAuto = edu.wpi.first.wpilibj2.command.Commands.sequence(
+        drivebase.runOnce(() -> drivebase.resetOdometry(START_BLUE_MID)),
+        pathfindTo(toPiece1),
+        pathfindTo(toReefSlot)
+    );
+
+    // Auto C: Right start → human station → reef slot
+    Command rightAuto = edu.wpi.first.wpilibj2.command.Commands.sequence(
+        drivebase.runOnce(() -> drivebase.resetOdometry(START_BLUE_RIGHT)),
+        pathfindTo(toHPStation),
+        pathfindTo(toReefSlot)
+    );
+
+        // Populate chooser
+        autoChooser.setDefaultOption("Left Start: Piece → HP", leftAuto);
+        autoChooser.addOption("Mid Start: Piece → Reef", midAuto);
+        autoChooser.addOption("Right Start: HP → Reef", rightAuto);
+
+
+   }
+
+
+public Command getAutonomousCommand() {
+
+
+
+ 
+        return autoChooser.getSelected();
+
+}
+
+
+private Command pathfindTo(Pose2d target) {
+  PathConstraints pfConstraints = new PathConstraints(
+      drivebase.getSwerveDrive().getMaximumChassisVelocity(),     // max linear m/s
+      4.0,                                                        // max accel m/s^2
+      drivebase.getSwerveDrive().getMaximumChassisAngularVelocity(), // max angular rad/s
+      edu.wpi.first.math.util.Units.degreesToRadians(720)         // max angular accel rad/s^2
+  );
+  return AutoBuilder.pathfindToPose(
+      target,
+      pfConstraints,
+      0.0  // goal end velocity at the target (m/s)
+      // If you want a rotation delay, use the 4-arg overload: ... , rotationDelayDistanceMeters
+  );
+}
 
   public void setMotorBrake(boolean brake)
   {
     drivebase.setMotorBrake(brake);
   }
+
+
+// RobotContainer.java
+public SwerveSubsystem getDrivebase() {
+    return drivebase;
+}
+
 }

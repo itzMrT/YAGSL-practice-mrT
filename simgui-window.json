@@ -18,8 +18,13 @@
   "Window": {
     "###/FMSInfo": {
       "Collapsed": "0",
-      "Pos": "60,60",
+      "Pos": "233,54",
       "Size": "181,167"
+    },
+    "###/SmartDashboard/Auto Chooser": {
+      "Collapsed": "0",
+      "Pos": "67,602",
+      "Size": "254,54"
     },
     "###/SmartDashboard/Field": {
       "Collapsed": "0",
@@ -33,8 +38,8 @@
     },
     "###Joysticks": {
       "Collapsed": "0",
-      "Pos": "250,465",
-      "Size": "796,189"
+      "Pos": "281,421",
+      "Size": "796,172"
     },
     "###Keyboard 0 Settings": {
       "Collapsed": "0",
@@ -48,7 +53,7 @@
     },
     "###NetworkTables Info": {
       "Collapsed": "1",
-      "Pos": "250,129",
+      "Pos": "226,390",
       "Size": "750,145"
     },
     "###Other Devices": {
@@ -64,7 +69,7 @@
     "###Timing": {
       "Collapsed": "0",
       "Pos": "5,150",
-      "Size": "135,219"
+      "Size": "135,173"
     },
     "Debug##Default": {
       "Collapsed": "0",
@@ -74,7 +79,7 @@
     "Robot State": {
       "Collapsed": "0",
       "Pos": "7,20",
-      "Size": "92,116"
+      "Size": "99,116"
     }
   }
 }
