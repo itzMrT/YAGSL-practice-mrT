@@ -3,6 +3,8 @@ package frc.robot.subsystems.swervedrive;
 import static edu.wpi.first.units.Units.Microseconds;
 import static edu.wpi.first.units.Units.Milliseconds;
 import static edu.wpi.first.units.Units.Seconds;
+import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.networktables.StructArrayPublisher;
 
 import edu.wpi.first.apriltag.AprilTagFieldLayout;
 import edu.wpi.first.apriltag.AprilTagFields;
@@ -49,6 +51,7 @@ import swervelib.telemetry.SwerveDriveTelemetry;
 public class Vision
 {
 
+
   /**
    * April Tag Field Layout of the year.
    */
@@ -75,7 +78,10 @@ public class Vision
    */
   private             Field2d             field2d;
 
-
+  private final StructArrayPublisher<Pose3d> tagPosesPublisher;
+private final StructArrayPublisher<Pose3d> robotPosesPublisher;
+private final StructArrayPublisher<Pose3d> robotPosesAcceptedPublisher;
+private final StructArrayPublisher<Pose3d> robotPosesRejectedPublisher;
   /**
    * Constructor for the Vision class.
    *
@@ -86,6 +92,18 @@ public class Vision
   {
     this.currentPose = currentPose;
     this.field2d = field;
+
+    NetworkTableInstance inst = NetworkTableInstance.getDefault();
+
+// Names match the ones recommended in the AdvantageKit vision template docs.
+tagPosesPublisher =
+    inst.getStructArrayTopic("Vision/Summary/TagPoses", Pose3d.struct).publish();
+robotPosesPublisher =
+    inst.getStructArrayTopic("Vision/Summary/RobotPoses", Pose3d.struct).publish();
+robotPosesAcceptedPublisher =
+    inst.getStructArrayTopic("Vision/Summary/RobotPosesAccepted", Pose3d.struct).publish();
+robotPosesRejectedPublisher =
+    inst.getStructArrayTopic("Vision/Summary/RobotPosesRejected", Pose3d.struct).publish();
 
     if (Robot.isSimulation())
     {
@@ -140,6 +158,10 @@ public class Vision
        */
       visionSim.update(swerveDrive.getSimulationDriveTrainPose().get());
     }
+
+    List<Pose3d> robotPoses = new ArrayList<>();
+    List<Pose3d> robotPosesAccepted = new ArrayList<>();
+    List<Pose3d> robotPosesRejected = new ArrayList<>();
     for (Cameras camera : Cameras.values())
     {
       Optional<EstimatedRobotPose> poseEst = getEstimatedGlobalPose(camera);
@@ -149,9 +171,17 @@ public class Vision
         swerveDrive.addVisionMeasurement(pose.estimatedPose.toPose2d(),
                                          pose.timestampSeconds,
                                          camera.curStdDevs);
+
+                                                     // NEW: log this raw vision pose
+            Pose3d pose3d = pose.estimatedPose;
+            robotPoses.add(pose3d);
+            // For now treat everything as "accepted" and nothing as rejected.
+            robotPosesAccepted.add(pose3d);
       }
     }
-
+    robotPosesPublisher.set(robotPoses.toArray(Pose3d[]::new));
+    robotPosesAcceptedPublisher.set(robotPosesAccepted.toArray(Pose3d[]::new));
+    robotPosesRejectedPublisher.set(robotPosesRejected.toArray(Pose3d[]::new));
   }
 
   /**
@@ -301,34 +331,36 @@ public class Vision
   /**
    * Update the {@link Field2d} to include tracked targets/
    */
-  public void updateVisionField()
-  {
-
-    List<PhotonTrackedTarget> targets = new ArrayList<PhotonTrackedTarget>();
-    for (Cameras c : Cameras.values())
-    {
-      if (!c.resultsList.isEmpty())
-      {
-        PhotonPipelineResult latest = c.resultsList.get(0);
-        if (latest.hasTargets())
-        {
-          targets.addAll(latest.targets);
+  public void updateVisionField() {
+    List<PhotonTrackedTarget> targets = new ArrayList<>();
+    for (Cameras c : Cameras.values()) {
+        if (!c.resultsList.isEmpty()) {
+            PhotonPipelineResult latest = c.resultsList.get(0);
+            if (latest.hasTargets()) {
+                targets.addAll(latest.targets);
+            }
         }
-      }
     }
 
-    List<Pose2d> poses = new ArrayList<>();
-    for (PhotonTrackedTarget target : targets)
-    {
-      if (fieldLayout.getTagPose(target.getFiducialId()).isPresent())
-      {
-        Pose2d targetPose = fieldLayout.getTagPose(target.getFiducialId()).get().toPose2d();
-        poses.add(targetPose);
-      }
+    List<Pose2d> poses2d = new ArrayList<>();
+    List<Pose3d> poses3d = new ArrayList<>();
+
+    for (PhotonTrackedTarget target : targets) {
+        Optional<Pose3d> tagPoseOpt = fieldLayout.getTagPose(target.getFiducialId());
+        if (tagPoseOpt.isPresent()) {
+            Pose3d tagPose3d = tagPoseOpt.get();
+            poses3d.add(tagPose3d);
+            poses2d.add(tagPose3d.toPose2d());
+        }
     }
 
-    field2d.getObject("tracked targets").setPoses(poses);
-  }
+    // Existing 2D field drawing
+    field2d.getObject("tracked targets").setPoses(poses2d);
+
+    // NEW: publish 3D tag poses for AdvantageScope Vision Target object
+    tagPosesPublisher.set(poses3d.toArray(Pose3d[]::new));
+}
+
 
   /**
    * Camera Enum to select each camera
